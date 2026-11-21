@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/Kaepora-HQ/kaepora/compare/v0.4.0...v0.5.0) (2026-11-21)
+
+
+### Features
+
+* add a setting that skips every cutscene a player could skip ([#81](https://github.com/Kaepora-HQ/kaepora/issues/81)) ([3569933](https://github.com/Kaepora-HQ/kaepora/commit/356993323cc641469694668c06f1120ffe9eb706))
+
+
+### Bug Fixes
+
+* let the Ocarina of Time wait for King Dodongo and Barinade only ([#77](https://github.com/Kaepora-HQ/kaepora/issues/77)) ([279c253](https://github.com/Kaepora-HQ/kaepora/commit/279c253ef9e889f774c2941f0a1e6c2eb7a0053d))
+
 ## [0.4.0](https://github.com/Kaepora-HQ/kaepora/compare/v0.3.1...v0.4.0) (2026-11-21)
 
 
