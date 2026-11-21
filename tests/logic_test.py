@@ -387,7 +387,7 @@ class LogicTest(unittest.TestCase):
         self.assertTrue(self.reachable("Forest Temple Blue Poe Chest", *without("Floormaster")))
 
     def test_an_open_forest_asks_nothing_of_a_child(self):
-        # Mido lets a child through to the Deku Tree with the Kokiri Sword and a Deku Shield, and the exit opens after
+        # Mido lets a child through to the Deku Tree with the Kokiri Sword and a shield, and the exit opens after
         # the Deku Tree. The forest's own chest holds the only sword a child can use.
         no_sword = ("KF Kokiri Sword Chest", "Green Rupee")
         for location in ("Deku Tree Map Chest", "HC Malon Egg"):
@@ -401,6 +401,16 @@ class LogicTest(unittest.TestCase):
         self.assertTrue(self.reachable("HC Malon Egg", *nothing_in_hand, settings=CLOSED_DEKU))
         self.assertFalse(self.reachable("Deku Tree Map Chest", *nothing_in_hand, settings=CLOSED_DEKU))
         self.assertTrue(self.reachable("Deku Tree Map Chest", settings=CLOSED_DEKU))
+
+    def test_mido_lets_a_child_by_with_the_hylian_shield(self):
+        # Without the forest shop's Deku Shield, and with the way out of the forest open, the child buys the Hylian
+        # Shield in the market.
+        no_deku_shield = ("KF Shop Item 1", "Green Rupee")
+        self.assertTrue(self.reachable("Deku Tree Map Chest", no_deku_shield, settings=CLOSED_DEKU))
+        no_sword = ("KF Kokiri Sword Chest", "Green Rupee")
+        self.assertFalse(self.reachable("Deku Tree Map Chest", no_sword, settings=CLOSED_DEKU))
+        no_hylian_shield = ("Market Bazaar Item 1", "Green Rupee")
+        self.assertFalse(self.reachable("Deku Tree Map Chest", no_deku_shield, no_hylian_shield, settings=CLOSED_DEKU))
 
     def test_an_open_bridge_needs_no_light_arrows(self):
         # Zelda gives the Light Arrows after the Spirit and the Shadow sages wake, and the bridge appears after her.
