@@ -108,4 +108,5 @@ A seed changes a few rules of the game, so that no order of play leaves it unfin
 - **Diving only gets deeper.** In the game, a Silver Scale picked up after the Golden Scale lowers how deep Link dives. With a seed it never goes down.
 - **The Master Sword goes back at any time.** In the game, adult Link can return the sword and be a child again only once the Forest Temple is done. With a seed he can from the start, and Sheik waits behind the pedestal, out of the way. One thing to watch: a child who warps to the Evil Desert Colossus or into Death Mountain Crater cannot walk out. Learn a warp song that lands somewhere else first: the Minuet, the Serenade, the Nocturne or the Prelude.
 - **Bombs need no strength.** Link can take a bomb out of the bag before he has a strength item.
+- **The Kokiri Sword chest gives only what it holds.** In the game, the scene after that chest puts a Kokiri Sword in Link's hand, whatever the chest held. With another item in the chest, a seed leaves the scene out.
 - **A few doors and scenes.** Four dungeon doors start open, and three story scenes no longer set a quest back.

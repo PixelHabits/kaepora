@@ -20,7 +20,8 @@ Usage: python3 -I tests/patch_test.py tested-mod <kaepora-patch> <game.nup> <tes
        python3 -I tests/patch_test.py larger-plan|bad-input|size-table|size-table-unchanged|together|gift| \
            other-version|start-values|shop|shop-table|new-actors|skulltulas|skulltula-table|loose-items| \
            loose-item-table|goods-and-copies|weapons-bring-containers|weapon-copies|event-numbers| \
-           song-table|presence|lichii-built-ins|opening-skipped|cutscenes-skipped <kaepora-patch> <game.nup>
+           song-table|presence|lichii-built-ins|opening-skipped|cutscenes-skipped|sword-scene-left-out| \
+           sword-scene-kept <kaepora-patch> <game.nup>
        python3 -I tests/patch_test.py gift-size-table|stone-texts|message-texts <kaepora-patch> <game.nup>
 
 The game's data is read from the container at test time. These readers are written apart from the patcher's, so a
@@ -121,6 +122,9 @@ NO_STONE = "GOSSIP_NOWHERE"
 STONE_FLOW = "Event/EventFlow/GossipStone.bfevfl.zs"
 OPENING_FLOW = "Event/EventFlow/OpeningEvent.bfevfl.zs"
 NAVI_WOKE_LINK = "HavePlayedEvent.Dm_Kokiri_0030"
+SWORD_CHEST_FILES = ["Banc/KokiriForest/KokiriForest_Adult_Dynamic.bcett.byml.zs",
+                     "Banc/KokiriForest/KokiriForest_Child_Dynamic.bcett.byml.zs"]
+SWORD_FLOW = "Event/EventFlow/Get_StoneOfForest.bfevfl.zs"
 # Mido's talk opens with his face and his voice, and a wooden sign's text with no code at all.
 MIDO_MESSAGES = "EventFlowMsg/Npc_Kokiri_Mido_Child.msbt"
 MIDO_TALK = "Talk_03"
@@ -1023,8 +1027,7 @@ def tested_sheik_mod(patch, game, plan_file, mod):
 
 # Chests whose items rotate: each takes the next one's item. The Kokiri Sword chest sits in the child and adult files.
 ROTATED = [
-    (KOKIRI_SWORD_CHEST, ["Banc/KokiriForest/KokiriForest_Adult_Dynamic.bcett.byml.zs",
-                          "Banc/KokiriForest/KokiriForest_Child_Dynamic.bcett.byml.zs"]),
+    (KOKIRI_SWORD_CHEST, SWORD_CHEST_FILES),
     (SLINGSHOT_CHEST, [DEKU_STATIC]),
     (8579518566955184384, [DEKU_STATIC]),
     (12161709650443144121, ["Banc/DodongoCavern/DodongoCavern_Static.bcett.byml.zs"]),
@@ -1048,7 +1051,7 @@ def larger_plan(patch, game):
 
     mod = patched(patch, game, plan(chests))
     changed = sorted({path for _, files in ROTATED for path in files})
-    assert sorted(mod) == changed, sorted(mod)
+    assert sorted(mod) == sorted(changed + [SWORD_FLOW]), sorted(mod)
     for path in changed:
         expected = originals[path]
         for h, files, drop_actor in chests:
@@ -1152,6 +1155,65 @@ def tested_opening_mod(patch, game, mod):
     data = game.game_data_list((romfs / GAME_DATA_LIST).read_bytes())
     entry = next(e for e in data["Data"]["Bool"] if e["Hash"][1] == murmur3(NAVI_WOKE_LINK))
     assert entry["DefaultValue"] == (BOOL, 1), entry
+
+
+def transitions(flow, entry):
+    """The events that the EventTransitions reached from the entry point of a parsed flow play, in the order of the
+    flow's events."""
+    events = flow["events"]
+    names = [name for _, name in flow["entry points"][0][1:]]
+    todo = [struct.unpack_from("<H", flow["entry points"][1][names.index(entry)][0], 4)[0]]
+    reached = set()
+    while todo:
+        index = todo.pop()
+        if index == 0xFFFF or index in reached:
+            continue
+        reached.add(index)
+        _, header, *rest = events[index]
+        kind, next_event, join = header[0], *struct.unpack_from("<HH", header, 2)
+        if kind in (0, 3, 4):  # action, join, sub-flow
+            todo.append(next_event)
+        elif kind in (1, 5):  # switch, sub-flow switch
+            todo += [event for _, event, _ in struct.iter_unpack("<IHH", rest[1] or b"")]
+        elif kind == 2:  # fork
+            todo += [event for (event,) in struct.iter_unpack("<H", rest[0])] + [join]
+    played = []
+    for index in sorted(reached):
+        _, header, *rest = events[index]
+        actor, action = struct.unpack_from("<HH", header, 4)
+        if header[0] == 0 and flow["actors"][actor][5][action] == "EventTransition":
+            params, values = rest[0]
+            played.append(values[[name for _, name in params[1:]].index("EventName")][1])
+    return played
+
+
+def without_sword_scene(flow):
+    """A parsed Get_StoneOfForest flow whose Kokiri Sword chest event goes on from the chest's give to Navi's lines
+    after the sword's scene."""
+    events = flow["events"]
+    index = {event[0]: i for i, event in enumerate(events)}
+    give = events[index["Event16"]]
+    assert struct.unpack_from("<H", give[1], 2)[0] == index["Event372"], give[1]
+    give[1] = give[1][:2] + struct.pack("<H", index["Event152"]) + give[1][4:]
+    return flow
+
+
+def sword_scene_left_out(patch, game):
+    """With another item in the Kokiri Sword chest, the chest's event gives that item and leaves out Dm_Kokiri_0063,
+    the scene of Link raising the sword."""
+    theirs = game.event_flow(game.read(SWORD_FLOW))
+    assert transitions(theirs, "GetSword") == ["Dm_SY_Treasurebox", "Dm_Kokiri_0063"]
+    mod = patched(patch, game, plan([(KOKIRI_SWORD_CHEST, SWORD_CHEST_FILES, "Item_Token_Gold")]))
+    assert SWORD_FLOW in mod, sorted(mod)
+    ours = game.event_flow(mod[SWORD_FLOW])
+    assert transitions(ours, "GetSword") == ["Dm_SY_Treasurebox"]
+    assert ours == without_sword_scene(theirs)
+
+
+def sword_scene_kept(patch, game):
+    """With the Kokiri Sword in its own chest, the chest's event is the game's, and Link raises the sword he found."""
+    mod = mod_files(patch, game, plan([(KOKIRI_SWORD_CHEST, SWORD_CHEST_FILES, "Item_Sword_Kokiri")]))
+    assert SWORD_FLOW not in mod, sorted(mod)
 
 
 def goods(actor):
@@ -1846,7 +1908,7 @@ def size_table_entries(patch, game):
     header, entries, names = raised_pouch_entry(patch, game, zstd.decompress(game_frame))
     mod = patched(patch, game, plan(chests))
     changed = sorted({path for _, files, _ in chests for path in files})
-    assert sorted(mod) == changed + [SIZE_TABLE], sorted(mod)
+    assert sorted(mod) == sorted(changed + [SIZE_TABLE, SWORD_FLOW]), sorted(mod)
     sizes = placement_sizes(game, mod, changed)
     game_sizes = dict(entries)
     assert [p for p in changed if load_size(sizes[size_key(p)]) > game_sizes[size_key(p)]] == [WATER_STATIC]
@@ -1864,7 +1926,7 @@ def size_table_unchanged(patch, game):
     sizes = placement_sizes(game, mod, changed)
     # Every written file still fits its entry, so the table is left out.
     assert all(load_size(size) <= game_sizes[key] for key, size in sizes.items()), sizes
-    assert sorted(mod) == changed, sorted(mod)
+    assert sorted(mod) == sorted(changed + [SWORD_FLOW]), sorted(mod)
 
 
 def gift(patch, game):
@@ -2056,8 +2118,8 @@ def message_bytes(text, page=RUMOUR_PAGE):
 def seed_plan(patch, game, plan_file):
     """A seed's plan, applied: each written file is the game's with every planned chest giving its item, also as its
     substitute where it has one, and as an added value where it names none, every planned stone and message saying
-    its text in both English text packs, and the opening skipped where the plan skips it. Each fits the size table entry
-    the game reads."""
+    its text in both English text packs, the opening skipped where the plan skips it, and the Kokiri Sword's scene left
+    out where its chest holds another item. Each fits the size table entry the game reads."""
     seed = json.loads(pathlib.Path(plan_file).read_text())
     expected, kinds = {}, set()
     for chest in seed["chests"]:
@@ -2084,6 +2146,9 @@ def seed_plan(patch, game, plan_file):
     flows = {path: game.event_flow(game.read(path)) for path in edited}
     if seed["opening_skipped"]:
         flows[OPENING_FLOW] = skipped_opening(game.event_flow(game.read(OPENING_FLOW)))
+    if any(int(chest["hash"]) == KOKIRI_SWORD_CHEST and chest["drop_actor"] != "Item_Sword_Kokiri"
+           for chest in seed["chests"]):
+        flows[SWORD_FLOW] = without_sword_scene(game.event_flow(game.read(SWORD_FLOW)))
     for text in seed["event_texts"]:
         string_parameter(flows[text["flow"]], text["event"], text["param"])[1] = text["text"]
     for number in seed["event_numbers"]:
@@ -2394,6 +2459,8 @@ def main():
         "tested-opening-mod": tested_opening_mod,
         "cutscenes-skipped": cutscenes_skipped,
         "tested-cutscenes-mod": tested_cutscenes_mod,
+        "sword-scene-left-out": sword_scene_left_out,
+        "sword-scene-kept": sword_scene_kept,
         "gift": gift,
         "gift-size-table": gift_size_table,
         "stone-texts": stone_texts,

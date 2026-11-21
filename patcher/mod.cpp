@@ -921,6 +921,15 @@ constexpr std::string_view WaitBeforeNavi = "Event27";
 constexpr std::string_view FadeOutAfterNavi = "Event25";
 constexpr std::string_view NaviWokeLink = "HavePlayedEvent.Dm_Kokiri_0030";
 
+// The Kokiri Sword chest's event, entry point GetSword of this flow, gives what the chest holds in Event16, plays the
+// scene of Link raising the sword, and from Event152 picks Navi's line. The scene puts a Kokiri Sword in his weapon
+// slot that is not in his pouch, and Mido lets him by with it.
+constexpr uint64_t KokiriSwordChest = 16757992849254467386u;
+constexpr std::string_view KokiriSword = "Item_Sword_Kokiri";
+constexpr std::string_view SwordFlow = "Event/EventFlow/Get_StoneOfForest.bfevfl.zs";
+constexpr std::string_view SwordChestGive = "Event16";
+constexpr std::string_view NaviLineAfterSword = "Event152";
+
 // The text pack with each planned stone saying its text, and each planned message its text after the codes the game's
 // message opens with.
 static std::string TextPack(GameFile& game, const std::string& path, const std::string& dictionary, const Plan& plan) {
@@ -1169,6 +1178,14 @@ std::map<std::string, std::string> ModFiles(const std::filesystem::path& nup, co
             changedFlows.insert(path);
         }
         if (bfevfl::SetNext(flowAt(path), WaitBeforeNavi, FadeOutAfterNavi)) {
+            changedFlows.insert(path);
+        }
+    }
+    if (std::ranges::any_of(plan.chests, [](const PlannedChest& chest) {
+            return chest.hash == KokiriSwordChest && chest.dropActor != KokiriSword;
+        })) {
+        const std::string path(SwordFlow);
+        if (bfevfl::SetNext(flowAt(path), SwordChestGive, NaviLineAfterSword)) {
             changedFlows.insert(path);
         }
     }
