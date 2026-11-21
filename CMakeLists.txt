@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 # Lichii needs macOS 15 or later, so the programs need no older one. project() reads this, so it comes first.
 set(CMAKE_OSX_DEPLOYMENT_TARGET 15.0 CACHE STRING "The oldest macOS the programs run on")
-project(kaepora VERSION 0.4.0 LANGUAGES C CXX) # x-release-please-version
+project(kaepora VERSION 0.5.0 LANGUAGES C CXX) # x-release-please-version
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
